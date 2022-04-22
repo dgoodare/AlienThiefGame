@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "Interact/Item.h"
+#include "Interact/DepositLocation.h"
 
 #include "GameFramework/Character.h"
 #include "Components/InputComponent.h"
@@ -50,6 +51,9 @@ protected:
 		void TraceForward();
 		void TraceForward_Implementation();
 
+	UPROPERTY(EditAnywhere)
+		int InventorySize;
+
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -60,5 +64,9 @@ public:
 private:
 	AActor* FocusedActor;//the (interactable) object the player is looking at
 	
-	void FocusedActorDistanceCheck();
+	void FocusedActorDistanceCheck();//checks if the focused object is still in range
+
+	void HandleItem(AItem* Item, IInteractInterface* Interface);//Handles an item that player interacts with
+
+	void HandleDeposit(ADepositLocation* Deposit, IInteractInterface* Interface);//Handles depositing of items
 };

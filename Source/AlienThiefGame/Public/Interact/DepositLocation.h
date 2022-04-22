@@ -4,18 +4,22 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+
 #include "InteractInterface.h"
-#include "InteractBase.generated.h"
+#include "Interact/Item.h"
+
+#include "DepositLocation.generated.h"
 
 UCLASS()
-class ALIENTHIEFGAME_API AInteractBase : public AActor, public IInteractInterface
+class ALIENTHIEFGAME_API ADepositLocation : public AActor, public IInteractInterface
 {
 	GENERATED_BODY()
 	
 public:	
 	// Sets default values for this actor's properties
-	AInteractBase();
+	ADepositLocation();
 
+	TArray<AItem*> DepositInventory;//stores the items deposited by the player
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -37,6 +41,7 @@ public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interact")
 		void EndFocus();
 		virtual void EndFocus_Implementation();
+
 
 
 };

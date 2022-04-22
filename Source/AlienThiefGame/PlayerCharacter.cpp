@@ -37,7 +37,10 @@ APlayerCharacter::APlayerCharacter()
 	FollowCamera->bUsePawnControlRotation = false;
 
 	//set default value for trace distance i.e. how close the player needs to be to interact with objects
-	TraceDistance = 350.0f;
+	TraceDistance = 340.0f;
+
+	//set max inventory capacity
+	InventorySize = 2;
 }
 
 // Called when the game starts or when spawned
@@ -70,7 +73,6 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	PlayerInputComponent->BindAxis("MoveForward", this, &APlayerCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("MoveRight", this, &APlayerCharacter::MoveRight);
 }
-
 
 /* Movement Functions*/
 void APlayerCharacter::MoveForward(float Axis)
@@ -109,30 +111,6 @@ void APlayerCharacter::FocusedActorDistanceCheck()
 	}
 }
 
-
-/*Interaction Functions*/
-void APlayerCharacter::InteractPressed_Implementation()
-{
-	TraceForward();
-	//if an interactable actor is found, execute the interaction
-	if (FocusedActor)
-	{
-		IInteractInterface* Interface = Cast<IInteractInterface>(FocusedActor);
-		if (Interface)
-		{
-			//check if Interface is an 'Item'
-			if (AItem* ItemCheck = Cast<AItem>(Interface))
-			{
-				//add item to invetory
-				Inventory.Add(ItemCheck);
-				//display message
-				GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Orange, TEXT("Item added to inventory"));
-			}
-			Interface->Execute_OnInteract(FocusedActor, this);
-		}
-	}
-}
-
 void APlayerCharacter::TraceForward_Implementation()
 {
 	FVector Location;
@@ -151,7 +129,7 @@ void APlayerCharacter::TraceForward_Implementation()
 
 	if (bHit)
 	{
-		//DrawDebugBox(GetWorld(), Hit.ImpactPoint, FVector(5, 5, 5), FColor::Emerald, false, 1.0f);
+		//DrawDebugBox(GetWorld(), Hit.ImpactPoint, FVector(5, 5, 5), FColor::Red, false, 1.0f);
 
 		AActor* Interactable = Hit.GetActor();
 
@@ -167,7 +145,15 @@ void APlayerCharacter::TraceForward_Implementation()
 				{
 					IInteractInterface* Interface = Cast<IInteractInterface>(FocusedActor);
 					
-					Interface->Execute_EndFocus(FocusedActor);
+					//make sure that the cast was successful, otherwise the game will crash
+					if (Interface)
+					{
+						Interface->Execute_EndFocus(FocusedActor);
+					}
+					else
+					{
+						UE_LOG(LogTemp, Warning, TEXT("Cast to Interface object failed"));
+					}
 				}
 				//set the focused actor to the new one
 				IInteractInterface* Interface = Cast<IInteractInterface>(Interactable);
@@ -181,7 +167,7 @@ void APlayerCharacter::TraceForward_Implementation()
 		}
 		else
 		{
-			
+
 			//reset the focused actor
 			if (FocusedActor)
 			{
@@ -191,8 +177,99 @@ void APlayerCharacter::TraceForward_Implementation()
 					Interface->Execute_EndFocus(FocusedActor);
 				}
 			}
-			
+
 			FocusedActor = nullptr;
 		}
+	}
+}
+
+
+/*Interaction Functions*/
+void APlayerCharacter::InteractPressed_Implementation()
+{
+	TraceForward();
+	//if an interactable actor is found, execute the interaction
+	if (FocusedActor)
+	{
+		IInteractInterface* Interface = Cast<IInteractInterface>(FocusedActor);
+		if (Interface)
+		{
+			//check if Interface is an 'Item'
+			if (AItem* ItemCheck = Cast<AItem>(Interface))
+			{
+				HandleItem(ItemCheck, Interface);
+			}
+			//check if Interface is a Deposit Location
+			else if (ADepositLocation* Deposit = Cast<ADepositLocation>(Interface))
+			{
+				HandleDeposit(Deposit, Interface);
+			}
+			else
+			{
+				Interface->Execute_OnInteract(FocusedActor, this);
+				Interface->Execute_EndFocus(FocusedActor);
+			}
+		}
+	}
+}
+
+void APlayerCharacter::HandleItem(AItem* Item, IInteractInterface* Interface)
+{
+	//if there is enough free space in inventory
+	if (Inventory.Num() < InventorySize)
+	{
+		//check if that object has already been stored
+		bool IsInInventory = false;
+		for (int i = 0; i < Inventory.Num(); i++)
+		{
+			if (Item == Inventory[i])
+			{
+				IsInInventory = true;
+			}
+		}
+
+		//a bug can occur that can allow the player to pick upan item twice, so need to check that
+		//the object reference isn't already in the item list
+		if (!IsInInventory)
+		{
+			//add to inventory
+			Interface->Execute_OnInteract(FocusedActor, this);
+			Inventory.Add(Item);
+			GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Orange, TEXT("Added item to inventory"));
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("Inventory size: %d"), Inventory.Num()));
+		}
+		else
+		{
+			//
+			GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Orange, TEXT("Item already in inventory"));
+		}
+			
+	}
+	else
+	{
+		//tell player 
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Orange, TEXT("Inventory full"));
+	}	
+}
+
+void APlayerCharacter::HandleDeposit(ADepositLocation* Deposit, IInteractInterface* Interface)
+{
+	if (Inventory.Num() == 0)
+	{
+		//if there is nothing in the player's inventory
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Green, TEXT("Inventory empty, nothing to deposit"));
+	}
+	else
+	{
+		/*Currently, only one item is deposited at a time. However, this could be changed*/
+
+		AItem* TempItem;
+				
+		//move the first item from player's inventory to the deposit location's inventory
+		TempItem = Inventory[0];
+		Deposit->DepositInventory.Add(TempItem);
+		Inventory.Remove(TempItem);
+		Interface->Execute_OnInteract(FocusedActor, this);
+		
 	}
 }

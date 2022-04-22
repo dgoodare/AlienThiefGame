@@ -3,16 +3,20 @@
 
 #include "EnemyCharacterController.h"
 #include "EnemyCharacter.h"
+
 #include "Waypoint.h"
+#include "Task.h"
+#include "PlayerCharacter.h"
+
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "Runtime/Engine/Classes/Kismet/GameplayStatics.h"
-#include "PlayerCharacter.h"
 
 AEnemyCharacterController::AEnemyCharacterController()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
+	//Setup Perception Component
 	SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("Sight Config"));
 	SetPerceptionComponent(*CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("Perception Component")));
 
@@ -28,6 +32,9 @@ AEnemyCharacterController::AEnemyCharacterController()
 	GetPerceptionComponent()->SetDominantSense(*SightConfig->GetSenseImplementation());
 	GetPerceptionComponent()->OnPerceptionUpdated.AddDynamic(this, &AEnemyCharacterController::OnPawnDetected);
 	GetPerceptionComponent()->ConfigureSense(*SightConfig);
+
+	//Setup State Machine Component
+	FSM = CreateDefaultSubobject<UStateMachine>(TEXT("State Machine"));
 }
 
 void AEnemyCharacterController::BeginPlay()
@@ -45,9 +52,14 @@ void AEnemyCharacterController::BeginPlay()
 	}
 
 	//setup list of waypoints
-	TSubclassOf<AWaypoint> ClassToFind;
-	ClassToFind = AWaypoint::StaticClass();
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ClassToFind, Waypoints);
+	TSubclassOf<AWaypoint> WaypointToFind;
+	WaypointToFind = AWaypoint::StaticClass();
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), WaypointToFind, Waypoints);
+
+	//initialise list of all task locations
+	TSubclassOf<ATask> TaskToFind;
+	TaskToFind = ATask::StaticClass();
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), TaskToFind, Tasks);
 
 	GoToRandomWaypoint();
 
@@ -117,4 +129,9 @@ void AEnemyCharacterController::GoToRandomWaypoint()
 	{
 		MoveToActor(GetRandomWaypoint());
 	}
+}
+
+void AEnemyCharacterController::DoNothing()
+{
+
 }

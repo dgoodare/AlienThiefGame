@@ -23,10 +23,6 @@ public:
 	//collision box
 	UPROPERTY(VisibleAnywhere, BluePrintReadWrite)
 		UBoxComponent* BoxComponent;
-
-	//reference to the next waypoint in the chain
-	UPROPERTY(EditAnywhere, BluePrintReadWrite)
-		AWaypoint* NextWaypoint;
 	
 
 protected:
@@ -37,11 +33,10 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
-	UFUNCTION()
-		void OnPlayerEnter(UPrimitiveComponent* OverlapComponent,
-						   AActor* OtherActor,
-						   UPrimitiveComponent* OtherComponent,
-						   int32 OtherBodyIndex,
-						   bool bFromSweep,
-						   const FHitResult& SweepResult);
+	void OnPlayerEnter(UPrimitiveComponent* OverlapComponent,
+		AActor* OtherActor,
+		UPrimitiveComponent* OtherComponent,
+		int32 OtherBodyIndex,
+		bool bFromSweep,
+		const FHitResult& SweepResult);
 };
