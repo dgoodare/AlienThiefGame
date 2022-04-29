@@ -4,10 +4,6 @@
 #include "EnemyCharacterController.h"
 #include "EnemyCharacter.h"
 
-#include "Waypoint.h"
-#include "Task.h"
-#include "PlayerCharacter.h"
-
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "Runtime/Engine/Classes/Kismet/GameplayStatics.h"
@@ -44,11 +40,18 @@ void AEnemyCharacterController::BeginPlay()
 	//setup perception
 	if (GetPerceptionComponent() != nullptr)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("All Systems Set"));
+		UE_LOG(LogTemp, Warning, TEXT("AI perception component successfully created"));
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("A problem occured"));
+		UE_LOG(LogTemp, Warning, TEXT("A problem occured creating AI perception"));
+	}
+
+	//get reference to player
+	ThePlayer = Cast<APlayerCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
+	if (ThePlayer == nullptr)//check that the cast did not return null
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Failed to get reference to Player"));
 	}
 
 	//setup list of waypoints
@@ -61,7 +64,15 @@ void AEnemyCharacterController::BeginPlay()
 	TaskToFind = ATask::StaticClass();
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), TaskToFind, Tasks);
 
-	GoToRandomWaypoint();
+	if (FSM != nullptr)
+	{
+		FSM->ControlFSM();
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Failed to get reference to State machine"));
+	}
+	
 
 }
 
@@ -74,9 +85,12 @@ void AEnemyCharacterController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if (DistanceToPlayer > AISightRadius)
+	if (ThePlayer->IsHiding && FSM->State == FSM->EnemyStates::CHASE)
 	{
-		bIsPlayerDetected = false;
+		FSM->EnemyEvents::ON_ENTER;
+		FSM->SetState(FSM->EnemyStates::SEARCH);
+		FSM->ControlFSM();
+		ThePlayer->StateIcon(1);
 	}
 }
 
@@ -98,7 +112,22 @@ void AEnemyCharacterController::OnPawnDetected(const TArray<AActor*>& DetectedPa
 		UE_LOG(LogTemp, Warning, TEXT("Distance: %f"), DistanceToPlayer);
 	}
 
-	bIsPlayerDetected = true;
+	
+	if (!ThePlayer->IsHiding && FSM->State != FSM->EnemyStates::CHASE)
+	{
+		FSM->EnemyEvents::ON_ENTER;
+		FSM->SetState(FSM->EnemyStates::CHASE);
+		FSM->ControlFSM();
+		ThePlayer->StateIcon(2);
+	}
+	else
+	{
+		FSM->EnemyEvents::ON_ENTER;
+		FSM->SetState(FSM->EnemyStates::SEARCH);
+		FSM->ControlFSM();
+		ThePlayer->StateIcon(1);
+	}
+	
 }
 
 void AEnemyCharacterController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)
@@ -106,8 +135,56 @@ void AEnemyCharacterController::OnMoveCompleted(FAIRequestID RequestID, const FP
 	//once a 'move' is complete, wait for and
 	Super::OnMoveCompleted(RequestID, Result);
 
-	GetWorldTimerManager().SetTimer(TimerHandle, this, &AEnemyCharacterController::GoToRandomWaypoint, 1.0f, false);
-	
+	//GetWorldTimerManager().SetTimer(TimerHandle, this, &AEnemyCharacterController::GoToRandomWaypoint, 1.0f, false);
+
+	/*It would have been cleaner to write the following section as a switch statement, but c++ does not
+	allow you to do this dynamically (as is required in this case)*/
+
+	if (FSM->State == FSM->EnemyStates::SELECT_TASK && FSM->Event == FSM->EnemyEvents::ON_ENTER)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Task location reached, entering new state"));
+		//Update FSM variables to transtion into the PERFROM_TASK state
+		FSM->EnemyEvents::ON_ENTER;
+		FSM->SetState(FSM->EnemyStates::PERFORM_TASK);
+		FSM->ControlFSM();
+		ThePlayer->StateIcon(0);
+	}
+	else if (FSM->State == FSM->EnemyStates::SEARCH)
+	{
+		FSM->Visited++;
+		//check if all the waypoints have been visited
+		if ( FSM->Visited < FSM->ToVisitList.Num() )
+		{
+			//increment visited counter
+			UE_LOG(LogTemp, Warning, TEXT("Visited %d waypoints"), FSM->Visited);
+			
+			//continue searching
+			FSM->ControlFSM();
+		}
+		else
+		{
+			//exit SEARCH state and enter SELECT_TASK
+			FSM->EnemyEvents::ON_ENTER;
+			FSM->SetState(FSM->EnemyStates::SELECT_TASK);
+			FSM->ControlFSM();
+			ThePlayer->StateIcon(0);
+		}
+		
+	}
+	else if (FSM->State == FSM->EnemyStates::CHASE)
+	{
+		if (ThePlayer->IsHiding)
+		{
+			FSM->EnemyEvents::ON_ENTER;
+			FSM->SetState(FSM->EnemyStates::SEARCH);
+			FSM->ControlFSM();
+			ThePlayer->StateIcon(0);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("CAPTURED!"));
+		}
+	}
 }
 
 AWaypoint* AEnemyCharacterController::GetRandomWaypoint()
@@ -122,8 +199,8 @@ void AEnemyCharacterController::GoToRandomWaypoint()
 {
 	if (bIsPlayerDetected == true)
 	{
-		APlayerCharacter* Player = Cast<APlayerCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
-		MoveToActor(Player, 5.0f);
+		
+		MoveToActor(ThePlayer, 5.0f);
 	}
 	else
 	{
@@ -131,7 +208,42 @@ void AEnemyCharacterController::GoToRandomWaypoint()
 	}
 }
 
-void AEnemyCharacterController::DoNothing()
+void AEnemyCharacterController::HandleTaskTimer()
 {
+	/*
+	UE_LOG(LogTemp, Warning, TEXT("Timer finished"));
+	
+	if (FSM->State == FSM->EnemyStates::CHASE)
+	{
+		//We don't want the Enemy changing out of the CHASE state, so stay in the same state
+		UE_LOG(LogTemp, Warning, TEXT("Continuing CHASE"));
+		FSM->ControlFSM();
+	}
+	else
+	{
+		//Update FSM variables to transtion into the PERFROM_TASK state
+		UE_LOG(LogTemp, Warning, TEXT("Player not detected staying in Passive mode"));
+		FSM->EnemyEvents::ON_UPDATE;
+		FSM->SetState(FSM->EnemyStates::SELECT_TASK);
+		FSM->ControlFSM();
+	}
+	*/
+	FSM->ControlFSM();
+}
 
+
+int AEnemyCharacterController::UpdateStateIcon_Implementation()
+{
+	if (FSM->State == FSM->EnemyStates::SELECT_TASK || FSM->State == FSM->EnemyStates::PERFORM_TASK)
+	{
+		return 0;
+	}
+	else if (FSM->State == FSM->EnemyStates::SEARCH)
+	{
+		return 1;
+	}
+	else
+	{
+		return 2;
+	}
 }

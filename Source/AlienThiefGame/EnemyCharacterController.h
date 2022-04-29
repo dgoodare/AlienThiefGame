@@ -8,6 +8,7 @@
 #include "StateMachine/StateMachine.h"
 #include "Waypoint.h"
 #include "Task.h"
+#include "PlayerCharacter.h"
 
 #include "EnemyCharacterController.generated.h"
 
@@ -35,10 +36,14 @@ public:
 	//function to retrieve a random waypoint
 	AWaypoint* GetRandomWaypoint();
 
-	void DoNothing();
+	void HandleTaskTimer();
 	
 	UFUNCTION()
 		void OnPawnDetected(const TArray<AActor*>& DetectedPawns);
+
+	UFUNCTION(BlueprintNativeEvent)
+		int UpdateStateIcon();
+		int UpdateStateIcon_Implementation();
 
 	//Vision Cone variables
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = AI)
@@ -60,8 +65,7 @@ public:
 		float DistanceToPlayer = 0.0f;
 
 	//State Manager object
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = AI)
-		class UStateMachine* FSM;
+	class UStateMachine* FSM;
 
 	//array to store waypoints
 	UPROPERTY()
@@ -71,8 +75,12 @@ public:
 	UPROPERTY()
 		TArray<AActor*> Tasks;
 
+	//Pointer to the Enemy's current task
 	UPROPERTY()
 		ATask* CurrentTask;
+
+	//Pointer to the player character
+	APlayerCharacter* ThePlayer;
 
 private:
 

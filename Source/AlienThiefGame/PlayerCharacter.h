@@ -6,6 +6,7 @@
 
 #include "Interact/Item.h"
 #include "Interact/DepositLocation.h"
+#include "Interact/HidingPlace.h"
 
 #include "GameFramework/Character.h"
 #include "Components/InputComponent.h"
@@ -31,7 +32,21 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera)
 		UCameraComponent* FollowCamera;
 
-	TArray<AItem*> Inventory;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = GUI)
+		TArray<AItem*> Inventory;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = GUI)
+		bool IsInventoryFull = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = GUI)
+		int InventorySize;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = GUI)
+		bool IsHiding = false;
+
+	UFUNCTION(BlueprintNativeEvent)
+		void StateIcon(int val);//Hides the player when they interact with a hiding place
+		void StateIcon_Implementation(int val);
 
 protected:
 	// Called when the game starts or when spawned
@@ -51,8 +66,17 @@ protected:
 		void TraceForward();
 		void TraceForward_Implementation();
 
-	UPROPERTY(EditAnywhere)
-		int InventorySize;
+	UFUNCTION(BlueprintNativeEvent)
+		void HandleHide(AHidingPlace* Hide);//Hides the player when they interact with a hiding place
+		void HandleHide_Implementation(AHidingPlace* Hide);
+
+	UFUNCTION(BlueprintNativeEvent)
+		void CheckInventory();//Hides the player when they interact with a hiding place
+		void CheckInventory_Implementation();
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = GUI)
+		int IconValue;
+
 
 public:	
 	// Called every frame
@@ -69,4 +93,5 @@ private:
 	void HandleItem(AItem* Item, IInteractInterface* Interface);//Handles an item that player interacts with
 
 	void HandleDeposit(ADepositLocation* Deposit, IInteractInterface* Interface);//Handles depositing of items
+	
 };

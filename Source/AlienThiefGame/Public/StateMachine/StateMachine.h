@@ -8,6 +8,7 @@
 
 #include "../EnemyCharacterController.h"
 #include "Task.h"
+#include "../Waypoint.h"
 
 #include "StateMachine.generated.h"
 
@@ -29,9 +30,6 @@ public:
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
-	//variable to store refrence to parent object (in this case an EnemyCharacterController)
-	//* Enemy = GetOwner();
-
 	//Enumeration of the different states the AI Enemy can be in
 	enum EnemyStates {SELECT_TASK, PERFORM_TASK, SEARCH, CHASE};
 	EnemyStates State = EnemyStates::SELECT_TASK;
@@ -39,6 +37,11 @@ public:
 	//Enumeration that dictates whether we are transitioning between states or executing the action in a particular state
 	enum EnemyEvents {ON_ENTER, ON_UPDATE};
 	EnemyEvents Event = EnemyEvents::ON_ENTER;
+
+	//An array to store waypoints enemy will search when in the SEARCH state
+	TArray<AWaypoint*> ToVisitList;
+	//Counter to store the number of waypoints visited in a single SEARCH cycle
+	int Visited;
 
 	//function that controls whether to change state or to continue in the same state
 	void ControlFSM();

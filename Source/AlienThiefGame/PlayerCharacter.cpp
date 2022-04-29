@@ -204,6 +204,10 @@ void APlayerCharacter::InteractPressed_Implementation()
 			{
 				HandleDeposit(Deposit, Interface);
 			}
+			else if (AHidingPlace* Hide = Cast<AHidingPlace>(Interface))
+			{
+				HandleHide(Hide);
+			}
 			else
 			{
 				Interface->Execute_OnInteract(FocusedActor, this);
@@ -227,7 +231,7 @@ void APlayerCharacter::HandleItem(AItem* Item, IInteractInterface* Interface)
 				IsInInventory = true;
 			}
 		}
-
+		
 		//a bug can occur that can allow the player to pick upan item twice, so need to check that
 		//the object reference isn't already in the item list
 		if (!IsInInventory)
@@ -235,6 +239,9 @@ void APlayerCharacter::HandleItem(AItem* Item, IInteractInterface* Interface)
 			//add to inventory
 			Interface->Execute_OnInteract(FocusedActor, this);
 			Inventory.Add(Item);
+			//Call function to update GUI
+			CheckInventory();
+
 			GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Orange, TEXT("Added item to inventory"));
 			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("Inventory size: %d"), Inventory.Num()));
 		}
@@ -247,7 +254,8 @@ void APlayerCharacter::HandleItem(AItem* Item, IInteractInterface* Interface)
 	}
 	else
 	{
-		//tell player 
+		//tell player inventory is full
+		CheckInventory();
 		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Orange, TEXT("Inventory full"));
 	}	
 }
@@ -257,7 +265,7 @@ void APlayerCharacter::HandleDeposit(ADepositLocation* Deposit, IInteractInterfa
 	if (Inventory.Num() == 0)
 	{
 		//if there is nothing in the player's inventory
-		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Green, TEXT("Inventory empty, nothing to deposit"));
+		//GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Green, TEXT("Inventory empty, nothing to deposit"));
 	}
 	else
 	{
@@ -269,7 +277,61 @@ void APlayerCharacter::HandleDeposit(ADepositLocation* Deposit, IInteractInterfa
 		TempItem = Inventory[0];
 		Deposit->DepositInventory.Add(TempItem);
 		Inventory.Remove(TempItem);
+
+		//Call function to update GUI
+		CheckInventory();
+
 		Interface->Execute_OnInteract(FocusedActor, this);
 		
 	}
 }
+
+void APlayerCharacter::HandleHide_Implementation(AHidingPlace* Hide)
+{
+	//if player is not already hiding
+	if (!IsHiding)
+	{
+		//move player to location of hiding place
+		IsHiding = true;
+		SetActorLocationAndRotation(Hide->GetActorLocation(), Hide->GetActorRotation(), false);
+	}
+	else
+	{
+		//move player outside of hiding location
+		IsHiding = false;
+		FVector Displace = Hide->GetActorForwardVector()*75;
+
+		SetActorLocationAndRotation(Hide->GetActorLocation()+Displace, Hide->GetActorRotation(), false);
+	}
+
+}
+
+void APlayerCharacter::CheckInventory_Implementation()
+{
+	if (Inventory.Num() == InventorySize)
+	{
+		IsInventoryFull = true;
+		//GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Green, TEXT("Inventory full"));
+	}
+	else
+	{
+		IsInventoryFull = false;
+		//GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Green, TEXT("There is still space in inventory"));
+	}
+}
+
+void APlayerCharacter::StateIcon_Implementation(int val)
+{
+	IconValue = val;
+}
+
+
+
+
+
+
+
+
+
+
+
